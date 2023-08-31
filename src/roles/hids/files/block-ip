@@ -1,0 +1,105 @@
+#!/bin/bash
+
+# Managed by Ansible
+
+# This script can be run interactively or called by an automated
+# process (e.g. via cron). In the latter case, use the -l option
+# so that stdout / stderr goes to rsyslog.
+
+set -u
+set -o pipefail
+
+# --------------------------------------------------------------------------- #
+#                       VARIABLE DEFINITIONS
+# --------------------------------------------------------------------------- #
+
+PATH=/usr/bin:/bin:/usr/sbin:/sbin
+
+readonly _block_set='blackhole'
+
+# --------------------------------------------------------------------------- #
+#                       FUNCTIONS
+# --------------------------------------------------------------------------- #
+
+errout() {
+        local _msg="${0##*/} error: ${1}"
+
+        if [ "${_logonly:-x}" == "true" ] ; then
+                logger -p local3.err "${_msg}"
+        else
+                printf '%s\n' "${_msg}" >&2
+        fi
+
+        exit 1
+}
+
+say() {
+        local _msg="${0##*/} info: ${1}"
+
+        if [ "${_logonly:-x}" == "true" ] ; then
+                logger -p local3.info "${_msg}"
+        else
+                printf '%s\n' "${_msg}"
+        fi
+}
+
+audit_ip_arg() {
+        local _reg='^([1-2]?[0-9]?[0-9]\.){3}[1-2]?[0-9]?[0-9]$'
+
+        if [ "${_ip:-x}" == "x" ] ; then
+                errout 'Give me an IP address to block'
+        fi
+
+        if [ "${_ip}" == "0.0.0.0" ] ; then
+                errout 'No way, 0.0.0.0 is too broad'
+        fi
+
+        if grep -Eq "${_reg}" <<<"${_ip}" ; then
+                :
+        else
+                errout "${_ip} does not look like an IP address"
+        fi
+}
+
+check_if_ip_already_blocked() {
+        # An exit code of 0 means it is already in the block set
+        nft get element inet filter ${_block_set} "{ ${_ip} }" \
+        > /dev/null 2>&1
+        return ${?}
+}
+
+add_ip_to_block_set() {
+        # Side note: adding a rule for an IP that is already
+        # in the set is not harmful. Even if added twice, it
+        # will only appear once in the set, and it will not
+        # restart the timeout for the IP.
+        nft add element inet filter ${_block_set} "{ ${_ip} }"
+
+        if [ ${?} -ne 0 ] ; then
+                errout "Problem adding ${_ip} to ${_block_set}"
+        fi
+}
+
+# --------------------------------------------------------------------------- #
+#                       MAIN LOGIC
+# --------------------------------------------------------------------------- #
+
+while [ "${#}" -gt 0 ]; do
+        case "${1}" in
+                -i|--ip) readonly _ip="${2}" ; shift
+                        ;;
+                -l|--logonly) readonly _logonly='true'
+                        ;;
+        esac
+        shift
+done
+
+audit_ip_arg
+check_if_ip_already_blocked
+
+if [ ${?} -gt 0 ] ; then
+        say "Adding IP ${_ip} to ${_block_set}"
+        add_ip_to_block_set
+fi
+
+exit 0

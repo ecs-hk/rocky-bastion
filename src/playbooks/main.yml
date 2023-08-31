@@ -1,0 +1,24 @@
+---
+- hosts: localhost
+  become: yes
+  roles:
+    - { role: baseline,
+       tags: [baseline],
+       when: ansible_distribution == lin_os and
+         ansible_distribution_major_version == lin_version }
+    - { role: sshd,
+        tags: [sshd],
+        when: ansible_distribution == lin_os and
+          ansible_distribution_major_version == lin_version }
+    - { role: firewall,
+        tags: [firewall],
+        when: ansible_distribution == lin_os and
+          ansible_distribution_major_version == lin_version }
+    - { role: hids,
+        tags: [hids],
+        when: ansible_distribution == lin_os and
+          ansible_distribution_major_version == lin_version }
+    - { role: logging,
+        tags: [logging],
+        when: ansible_distribution == lin_os and
+          ansible_distribution_major_version == lin_version }

@@ -1,0 +1,3 @@
+ansible-core==2.15
+cryptography==41.0
+Jinja2==3.1.2

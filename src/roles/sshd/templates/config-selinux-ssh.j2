@@ -1,0 +1,100 @@
+#!/bin/bash
+
+# Managed by Ansible
+
+# This script tells SELinux to treat the specified $_port value as
+# a legitimate SSH daemon port.
+
+set -u
+set -o pipefail
+
+# --------------------------------------------------------------------------- #
+#                       VARIABLE DEFINITIONS
+# --------------------------------------------------------------------------- #
+
+PATH=/usr/bin:/bin:/usr/sbin:/sbin
+
+readonly _port='{{ sshd_port }}'
+
+readonly _of="$(mktemp)"
+
+# --------------------------------------------------------------------------- #
+#                       FUNCTIONS
+# --------------------------------------------------------------------------- #
+
+errout() {
+        local _msg="${0##*/} error: ${1}"
+        printf '%s\n' "${_msg}" >&2
+        exit 1
+}
+
+cleanup() {
+        rm -f "${_of}"
+}
+
+check_if_port_ready_for_sshd() {
+        local _reg="^ssh_port_t[ ]+tcp[ ]+.*\<${_port}\>"
+
+	grep -Eq "${_reg}" "${_of}"
+	_rc=${?}
+
+	if [ ${_rc} -eq 0 ] ; then
+		# All good, already ready for SSH daemon
+		:
+	elif [ ${_rc} -eq 1 ] ; then
+		# Need to configure port for SSH daemon
+		return 1
+	else
+		errout 'Unable to determine port status (sshd)'
+	fi
+}
+
+check_if_port_used_for_other_purpose() {
+        local _reg="[ ]+tcp[ ]+.*\<${_port}\>"
+
+	grep -Eq "${_reg}" "${_of}"
+	_rc=${?}
+
+	if [ ${_rc} -eq 0 ] ; then
+		errout "Port ${_port} SELinux conflict (choose a new port!)"
+	elif [ ${_rc} -eq 1 ] ; then
+		# All good, no conflicts
+		:
+	else
+		errout 'Unable to determine port status (other)'
+	fi
+}
+
+configure_port_for_sshd() {
+	semanage port -a -t ssh_port_t -p tcp "${_port}"
+
+        if [ ${?} -ne 0 ] ; then
+                errout "Problem configuring port ${_port}"
+        fi
+}
+
+# --------------------------------------------------------------------------- #
+#                       CLEANUP AND SIGNAL HANDLING
+# --------------------------------------------------------------------------- #
+
+trap 'cleanup' EXIT
+trap 'exit 2' HUP INT QUIT TERM
+
+# --------------------------------------------------------------------------- #
+#                       MAIN LOGIC
+# --------------------------------------------------------------------------- #
+
+semanage port -l > "${_of}"
+
+if [ ${?} -ne 0 ] ; then
+	errout 'Problem gathering SELinux port data'
+fi
+
+check_if_port_ready_for_sshd
+
+if [ ${?} -eq 1 ] ; then
+	check_if_port_used_for_other_purpose
+	configure_port_for_sshd
+fi
+
+exit 0

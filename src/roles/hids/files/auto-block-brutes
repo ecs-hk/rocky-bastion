@@ -1,0 +1,56 @@
+#!/bin/bash
+
+# Managed by Ansible
+
+# This script is designed to be called by cron. Any output from its
+# execution will go to rsyslog rather than stdout / stderr.
+
+set -u
+set -o pipefail
+
+# -------------------------------------------------------------------------- #
+#                       VARIABLE DEFINITIONS
+# -------------------------------------------------------------------------- #
+
+PATH=/usr/bin:/bin:/usr/local/sbin
+
+readonly _od="$(mktemp -d -p /tmp ${0##*/}.XXXXXX)"
+readonly _baddie_ips="${_od}/ip-addresses"
+
+# -------------------------------------------------------------------------- #
+#                       FUNCTIONS
+# -------------------------------------------------------------------------- #
+
+errout() {
+        local _msg="${0##*/} error: ${1}"
+        logger -p local3.err "${_msg}"
+        exit 1
+}
+
+cleanup() {
+        rm -fr "${_od}"
+}
+
+# --------------------------------------------------------------------------- #
+#                       CLEANUP AND SIGNAL HANDLING
+# --------------------------------------------------------------------------- #
+
+trap 'cleanup' EXIT
+trap 'exit 2' HUP INT QUIT TERM
+
+# -------------------------------------------------------------------------- #
+#                       MAIN LOGIC
+# -------------------------------------------------------------------------- #
+
+get-ssh-baddies -l > "${_baddie_ips}"
+[ ${?} -ne 0 ] && errout 'Problem running SSH baddies script'
+
+# If no baddie IPs were detected, quietly get out.
+[ ! -s "${_baddie_ips}" ] && exit 0
+
+while IFS='' read -r _ip || [ -n "${_ip}" ] ; do
+        block-ip -l -i "${_ip}"
+        [ ${?} -ne 0 ] && errout "Problem blocking IP ${_ip}"
+done < "${_baddie_ips}"
+
+exit 0

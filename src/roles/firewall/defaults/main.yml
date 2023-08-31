@@ -1,0 +1,3 @@
+---
+firewall_blackhole_timeout: "8h"
+sshd_port: 11066

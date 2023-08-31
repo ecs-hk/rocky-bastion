@@ -1,0 +1,44 @@
+---
+##############################################################################
+- block:
+##############################################################################
+
+  - name: Ensure local rsyslog files exist
+    ansible.builtin.file:
+      path: "{{ item }}"
+      state: touch
+      modification_time: preserve
+      access_time: preserve
+    with_items:
+      - "{{ chatter_log }}"
+      - "{{ playbook_log }}"
+    notify:
+      - restart rsyslog
+
+##############################################################################
+- block:
+##############################################################################
+
+  - name: Render bastion chatter logrotate configuration
+    ansible.builtin.template:
+      src: "chatter-logrotate.j2"
+      dest: "/etc/logrotate.d/baschatter"
+
+  - name: Render bastion chatter rsyslog configuration
+    ansible.builtin.template:
+      src: "chatter-rsyslog.j2"
+      dest: "/etc/rsyslog.d/baschatter.conf"
+    notify:
+      - restart rsyslog
+
+  - name: Render playbook logrotate configuration
+    ansible.builtin.template:
+      src: "playbook-logrotate.j2"
+      dest: "/etc/logrotate.d/ansibleplay"
+
+  - name: Render playbook rsyslog configuration
+    ansible.builtin.template:
+      src: "playbook-rsyslog.j2"
+      dest: "/etc/rsyslog.d/ansibleplay.conf"
+    notify:
+      - restart rsyslog

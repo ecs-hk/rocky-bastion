@@ -1,0 +1,26 @@
+---
+##############################################################################
+- block:
+##############################################################################
+
+  - name: Copy SSH HIDS scripts
+    ansible.builtin.copy:
+      src: "{{ item }}"
+      dest: "/usr/local/sbin/{{ item }}"
+      mode: 0500
+    with_items:
+      - "auto-block-brutes"
+      - "block-ip"
+      - "get-ssh-baddies"
+
+##############################################################################
+- block:
+##############################################################################
+
+  - name: Create cronjob to run SSH HIDS main script
+    ansible.builtin.cron:
+      name: "temporarily block IPs for brute force SSH creeps"
+      minute: "*/05"
+      user: root
+      job: "/usr/local/sbin/auto-block-brutes"
+      cron_file: ansible_auto-block-brutes

@@ -1,0 +1,98 @@
+#!/bin/bash
+
+# Prepares venv and installs Ansible packages
+
+# --------------------------------------------------------------------------- #
+#                       SHELL OPTIONS
+# --------------------------------------------------------------------------- #
+
+set -u
+set -o pipefail
+
+# --------------------------------------------------------------------------- #
+#                       VARIABLE DEFINITIONS
+# --------------------------------------------------------------------------- #
+
+PATH=/usr/bin:/bin
+
+readonly _venv_p='var/venv'
+readonly _venv_activate="${_venv_p}/bin/activate"
+readonly _output='var/messages.txt'
+
+# --------------------------------------------------------------------------- #
+#                       HELPER FUNCTIONS
+# --------------------------------------------------------------------------- #
+
+errout() {
+        local _msg="${0##*/} error: ${1}"
+        printf '%s\n' "${_msg}" >&2
+        exit 1
+}
+
+audit_basics() {
+        for _i in 'python3' 'pip3' ; do
+                which "${_i}" > /dev/null 2>&1
+                [ ${?} -ne 0 ] && errout "${_i} not found in PATH"
+        done
+
+        for _i in '.git' 'requirements.txt' ; do
+                [ ! -e "${_i}" ] && errout 'Run me from top repo directory'
+        done
+}
+
+# --------------------------------------------------------------------------- #
+#                       SETUP FUNCTIONS
+# --------------------------------------------------------------------------- #
+
+create_python_venv() {
+        python3 -m venv "${_venv_p}"
+        [ ${?} -ne 0 ] && errout 'Problem creating venv'
+}
+
+activate_python_venv() {
+        . "${_venv_activate}"
+        [ ${?} -ne 0 ] && errout 'Problem activating venv'
+}
+
+install_pip_packages() {
+        printf '%s\n' "Logging pip install chatter to ${_output}.."
+        cp /dev/null "${_output}"
+
+        # Prepare pip
+        pip3 install --no-cache-dir --upgrade pip >> "${_output}" 2>&1
+        [ ${?} -ne 0 ] && errout 'Problem upgrading pip'
+
+        # Install Ansible packages
+        pip3 install -r requirements.txt >> "${_output}" 2>&1
+        [ ${?} -ne 0 ] && errout 'Problem installing pip packages'
+}
+
+install_packages() {
+        local _rc
+
+        if [ -e "${_venv_activate}" ] ; then
+                printf '%s\n' 'venv OK'
+        else
+                printf '%s\n' 'Building new venv, wait..'
+                create_python_venv
+                activate_python_venv
+                install_pip_packages
+        fi
+}
+
+# --------------------------------------------------------------------------- #
+#                       MAIN LOGIC
+# --------------------------------------------------------------------------- #
+
+if [ "$(whoami)" == "root" ] ; then
+        errout 'Run me as a regular user (not root!)'
+fi
+
+# Pre-flight prep
+mkdir -p "${_venv_p}"
+
+# Audits, env setup, package installation
+audit_basics
+install_packages
+
+exit 0

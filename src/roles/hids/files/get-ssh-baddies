@@ -1,0 +1,131 @@
+#!/bin/bash
+
+# Managed by Ansible
+
+# This script can be run interactively or called by an automated
+# process (e.g. via cron). In the latter case, use the -l option
+# so that stderr goes to rsyslog.
+#
+# When debugging, use the -d option to view temporary files.
+
+set -u
+set -o pipefail
+
+# -------------------------------------------------------------------------- #
+#                       VARIABLE DEFINITIONS
+# -------------------------------------------------------------------------- #
+
+PATH=/usr/bin:/bin:/usr/sbin:/sbin
+
+readonly _od="$(mktemp -d -p /tmp ${0##*/}.XXXXXX)"
+readonly _slog="${_od}/sshd-logs"
+readonly _invalids="${_od}/invalid-user-attempts"
+readonly _rootnoops="${_od}/root-user-attempts"
+readonly _miskexes="${_od}/mismatched-key-exchanges"
+readonly _ips="${_od}/ip-addresses"
+
+readonly _timeframe='30 minutes ago'
+
+# -------------------------------------------------------------------------- #
+#                       FUNCTIONS
+# -------------------------------------------------------------------------- #
+
+errout() {
+        local _msg="${0##*/} error: ${1}"
+
+        if [ "${_logonly:-x}" == "true" ] ; then
+                logger -p local3.err "${_msg}"
+        else
+                printf '%s\n' "${_msg}" >&2
+        fi
+
+        exit 1
+}
+
+cleanup() {
+        if [ "${_debug:-x}" == "true" ] ; then
+                printf '%s\n' "View processed data in ${_od}"
+        else
+                rm -fr "${_od}"
+        fi
+}
+
+get_recent_sshd_logs() {
+        journalctl -u sshd -o cat -S "${_timeframe}" > "${_slog}"
+
+        if [ ${?} -ne 0 ] ; then
+                errout 'Problem searching sshd logs'
+        fi
+}
+
+get_invalid_users() {
+        grep -E 'Invalid user' "${_slog}" > "${_invalids}"
+
+        if [ ${?} -gt 1 ] ; then
+                errout 'Problem checking for invalid users'
+        fi
+}
+
+get_root_fails() {
+        grep -E 'User root from .* not allowed' "${_slog}" > "${_rootnoops}"
+
+        if [ ${?} -gt 1 ] ; then
+                errout 'Problem checking for root fails'
+        fi
+}
+
+get_mismatched_kexes() {
+        local _reg
+        _reg='Unable to negotiate .* no matching key exchange method found'
+
+        grep -E "${_reg}" "${_slog}" > "${_miskexes}"
+
+        if [ ${?} -gt 1 ] ; then
+                errout 'Problem checking for mismatched key exchanges'
+        fi
+}
+
+get_ip_addresses() {
+        local _reg='\b([1-2]?[0-9]?[0-9]\.){3}[1-2]?[0-9]?[0-9]\b'
+
+        for _i in "${_invalids}" "${_rootnoops}" "${_miskexes}" ; do
+                grep -Eo "${_reg}" "${_i}" >> "${_ips}"
+
+                if [ ${?} -gt 1 ] ; then
+                        errout 'Problem capturing IPs'
+                fi
+        done
+}
+
+# --------------------------------------------------------------------------- #
+#                       CLEANUP AND SIGNAL HANDLING
+# --------------------------------------------------------------------------- #
+
+trap 'cleanup' EXIT
+trap 'exit 2' HUP INT QUIT TERM
+
+# -------------------------------------------------------------------------- #
+#                       MAIN LOGIC
+# -------------------------------------------------------------------------- #
+
+while [ "${#}" -gt 0 ]; do
+        case "${1}" in
+                -d|--debug) readonly _debug='true'
+                        ;;
+                -l|--logonly) readonly _logonly='true'
+                        ;;
+        esac
+        shift
+done
+
+get_recent_sshd_logs
+
+if [ -s "${_slog}" ] ; then
+        get_invalid_users
+        get_root_fails
+        get_mismatched_kexes
+        get_ip_addresses
+        sort -u "${_ips}"
+fi
+
+exit 0

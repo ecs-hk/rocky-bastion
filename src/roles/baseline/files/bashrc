@@ -1,0 +1,4 @@
+# Managed by Ansible
+
+export EDITOR=vi
+export PS1="[\h] \W# "

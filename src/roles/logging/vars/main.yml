@@ -1,0 +1,3 @@
+---
+chatter_log: "/var/log/bastion-chatter"
+playbook_log: "/var/log/ansible-playbook"

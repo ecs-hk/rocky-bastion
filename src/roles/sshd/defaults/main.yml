@@ -1,0 +1,9 @@
+---
+sshd_allowed_group: "sshpass"
+sshd_port: 11066
+sshd_banner: |
+  ...........................................................................
+  Unauthorized use of this system and its networking resources is prohibited.
+
+           Violators will prosecuted to the full extent of the law.
+  ...........................................................................

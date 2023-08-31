@@ -1,0 +1,62 @@
+---
+##############################################################################
+- block:
+##############################################################################
+
+  - name: Install baseline packages
+    ansible.builtin.dnf:
+      name: "{{ item }}"
+      state: present
+    with_items:
+      - "dnf-automatic"
+      - "jq"
+      - "nftables"
+      - "policycoreutils-python-utils"
+      - "tmux"
+      - "vim"
+
+##############################################################################
+- block:
+##############################################################################
+
+  - name: Ensure important service are running and enabled
+    ansible.builtin.service:
+      name: "{{ item }}"
+      state: started
+      enabled: yes
+    with_items:
+      - "chronyd"
+      - "crond"
+      - "nftables"
+      - "rsyslog"
+      - "sshd"
+
+##############################################################################
+- block:
+##############################################################################
+
+  - name: Configure automatic package security updates
+    ansible.builtin.copy:
+      src: "dnf-automatic.conf"
+      dest: "/etc/dnf/automatic.conf"
+      backup: true
+
+##############################################################################
+- block:
+##############################################################################
+
+  - name: Make root slightly better with bashrc tuning
+    ansible.builtin.copy:
+      src: "bashrc"
+      dest: "/root/.bashrc"
+      backup: true
+
+  - name: Make root way cooler with shell history scrolling
+    ansible.builtin.copy:
+      src: "inputrc"
+      dest: "/root/.inputrc"
+
+  - name: Make root much awesomer with vim settings
+    ansible.builtin.copy:
+      src: "vimrc"
+      dest: "/root/.vimrc"

@@ -1,0 +1,90 @@
+#!/bin/bash
+
+# Runs Ansible playbook using pre-built venv
+
+# --------------------------------------------------------------------------- #
+#                       SHELL OPTIONS
+# --------------------------------------------------------------------------- #
+
+set -u
+set -o pipefail
+
+# --------------------------------------------------------------------------- #
+#                       VARIABLE DEFINITIONS
+# --------------------------------------------------------------------------- #
+
+PATH=/usr/bin:/bin
+
+readonly _venv_p='var/venv'
+readonly _venv_activate="${_venv_p}/bin/activate"
+
+readonly _prep_script='bin/prepare-venv'
+
+readonly _inventory='inventory/localhost'
+readonly _os_vars='extra_vars/os.yml'
+readonly _custom_vars='extra_vars/custom-local.yml'
+
+# --------------------------------------------------------------------------- #
+#                       HELPER FUNCTIONS
+# --------------------------------------------------------------------------- #
+
+errout() {
+        local _msg="${0##*/} error: ${1}"
+        logger -p local3.err "${_msg}"
+        printf '%s\n' "${_msg}" >&2
+        exit 1
+}
+
+audit_basics() {
+        if [ ! -e '.git' ] ; then
+                errout 'Run me from top repo directory'
+        fi
+
+        if [ ! -e "${_venv_activate}" ] ; then
+                errout "venv not ready (run '${_prep_script}' first)"
+        fi
+}
+
+# --------------------------------------------------------------------------- #
+#                       FUNCTIONS
+# --------------------------------------------------------------------------- #
+
+activate_python_venv() {
+        . "${_venv_activate}"
+
+        if [ ${?} -ne 0 ] ; then
+                errout 'Problem activating venv'
+        fi
+}
+
+cwd_to_ansible_src_dir() {
+        local _d='src'
+
+        cd "${_d}"
+
+        if [ ${?} -ne 0 ] ; then
+                errout "Something borked, no ${_d} directory"
+        fi
+}
+
+run_playbook() {
+        ansible-playbook playbooks/main.yml                             \
+        -i "${_inventory}"                                              \
+        -e "@${_os_vars}"                                               \
+        -e "@${_custom_vars}"
+
+        if [ ${?} -ne 0 ] ; then
+                errout 'Problem running playbook'
+        fi
+}
+
+# --------------------------------------------------------------------------- #
+#                       MAIN LOGIC
+# --------------------------------------------------------------------------- #
+
+audit_basics
+activate_python_venv
+cwd_to_ansible_src_dir
+run_playbook
+
+exit 0
