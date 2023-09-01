@@ -41,61 +41,64 @@ errout() {
 }
 
 flush_ruleset() {
-	# Start clean
-	nft flush ruleset
-	[ ${?} -eq 0 ] || return 1
+        # Start clean
+        nft flush ruleset
+        [ ${?} -eq 0 ] || return 1
 
-	nft add table inet filter
-	[ ${?} -eq 0 ] || return 1
+        nft add table inet filter
+        [ ${?} -eq 0 ] || return 1
 }
 
 add_chains() {
-	local _c='nft add chain inet filter'
+        local _c='nft add chain inet filter'
 
-	# Add chains (start with input 'accept' so no get locked out)
-	${_c} input "{ type filter hook input priority 0; policy accept; }"
-	[ ${?} -eq 0 ] || return 1
+        # Add chains (start with input 'accept' so no get locked out)
+        ${_c} input "{ type filter hook input priority 0; policy accept; }"
+        [ ${?} -eq 0 ] || return 1
 
-	${_c} forward "{ type filter hook forward priority 0; policy drop; }"
-	[ ${?} -eq 0 ] || return 1
+        ${_c} forward "{ type filter hook forward priority 0; policy drop; }"
+        [ ${?} -eq 0 ] || return 1
 
-	${_c} output "{ type filter hook output priority 0; policy accept; }"
-	[ ${?} -eq 0 ] || return 1
+        ${_c} output "{ type filter hook output priority 0; policy accept; }"
+        [ ${?} -eq 0 ] || return 1
 }
 
 add_blackhole_set() {
         local _c='nft add set inet filter blackhole'
         ${_c} "{ type ipv4_addr; timeout ${_fbt}; size 65536; }"
-	[ ${?} -eq 0 ] || return 1
+        [ ${?} -eq 0 ] || return 1
 }
 
 add_internal_allow() {
         nft add rule inet filter input meta iifname "internal" accept
-	[ ${?} -eq 0 ] || return 1
+        [ ${?} -eq 0 ] || return 1
+
+        nft add rule inet filter input meta iif lo accept
+        [ ${?} -eq 0 ] || return 1
 }
 
 add_state_handling() {
         local _c='nft add rule inet filter input'
 
         ${_c} ct state "{ established, related }" accept
-	[ ${?} -eq 0 ] || return 1
+        [ ${?} -eq 0 ] || return 1
 }
 
 add_input_chain_rules() {
         local _c='nft add rule inet filter input'
 
         ${_c} ip saddr @blackhole drop
-	[ ${?} -eq 0 ] || return 1
+        [ ${?} -eq 0 ] || return 1
 
         ${_c} tcp dport ${_sshd_port} accept
-	[ ${?} -eq 0 ] || return 1
+        [ ${?} -eq 0 ] || return 1
 }
 
 default_input_chain_to_drop() {
         local _c='nft chain inet filter'
 
-	${_c} input "{ type filter hook input priority 0; policy drop; }"
-	[ ${?} -eq 0 ] || return 1
+        ${_c} input "{ type filter hook input priority 0; policy drop; }"
+        [ ${?} -eq 0 ] || return 1
 }
 
 # --------------------------------------------------------------------------- #
