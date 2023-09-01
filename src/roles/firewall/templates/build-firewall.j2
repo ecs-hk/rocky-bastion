@@ -72,6 +72,9 @@ add_blackhole_set() {
 add_internal_allow() {
         nft add rule inet filter input meta iifname "internal" accept
 	[ ${?} -eq 0 ] || return 1
+
+        nft add rule inet filter input meta iif lo accept
+        [ ${?} -eq 0 ] || return 1
 }
 
 add_state_handling() {
