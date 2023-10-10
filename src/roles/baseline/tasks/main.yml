@@ -27,6 +27,7 @@
     with_items:
       - "chronyd"
       - "crond"
+      - "dnf-automatic.timer"
       - "nftables"
       - "rsyslog"
       - "sshd"
