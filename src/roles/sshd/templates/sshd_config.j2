@@ -25,6 +25,13 @@ KbdInteractiveAuthentication yes
 PubkeyAuthentication yes
 AuthorizedKeysFile {{ sshd_local_path }}/authorized_keys.%u
 
+{% if sshd_require_fido is defined and sshd_require_fido|bool %}
+# Only SSH pubkeys generated with a FIDO hardware token will be
+# allowed to authenticate. For more information, read:
+# https://developers.yubico.com/SSH/Securing_SSH_with_FIDO2.html
+PubkeyAcceptedAlgorithms sk-ssh-ed25519@openssh.com
+{% endif %}
+
 HostbasedAuthentication no
 PasswordAuthentication no
 KerberosAuthentication no
