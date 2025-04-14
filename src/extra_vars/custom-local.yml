@@ -16,4 +16,6 @@ hey_you_read_this: |
 #           Violators will prosecuted to the full extent of the law.
 #  ...........................................................................
 #
+#sshd_require_fido: false
+#
 ##############################################################################
