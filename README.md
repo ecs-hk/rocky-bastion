@@ -1,5 +1,11 @@
 # rocky-bastion
 
+******
+
+Archiving unless/until actively maintained again. (Debian preferred.)
+
+******
+
 Helper scripts and Ansible for quick setup of a bastion server.
 
 * Designed to work with **Rocky Linux 9**
